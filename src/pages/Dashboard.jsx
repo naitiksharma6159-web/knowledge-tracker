@@ -1,71 +1,27 @@
-import React from "react";
 import { Link } from "react-router-dom";
 import { Brain, Flame, Clock, AlertTriangle, Calendar, Award, TrendingUp } from "lucide-react";
 import useLocalStorage from "../hooks/useLocalStorage";
 import { INITIAL_TOPICS } from "../utils/mockData";
 import Card from "../components/Card";
 import Button from "../components/Button";
+import { getRevisionRecommendations } from "../utils/decayEngine";
 
 const Dashboard = () => {
   const [topics] = useLocalStorage("topics", INITIAL_TOPICS);
 
-  // Helper: calculate days elapsed since last studied date
-  const getDaysElapsed = (dateString) => {
-    const lastDate = new Date(dateString);
-    const currentDate = new Date("2026-06-20"); // Using current system date from mock constraints
-    const diffTime = Math.abs(currentDate - lastDate);
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays || 0;
-  };
+  // Compute stats dynamically using the centralized decay engine
+  const annotatedTopics = getRevisionRecommendations(topics);
 
-  // Helper: determine topic risk category
-  const calculateTopicRisk = (topic) => {
-    const daysElapsed = getDaysElapsed(topic.lastStudied);
-    
-    // HEURISTIC: high decay factors depend on elapsed time, low quiz marks, or low self-rated confidence
-    if (topic.confidenceScore <= 2 || topic.quizScore < 60 || daysElapsed > 7) {
-      return "High";
-    } else if (topic.confidenceScore === 3 || (topic.quizScore >= 60 && topic.quizScore < 80) || daysElapsed >= 4) {
-      return "Medium";
-    } else {
-      return "Low";
-    }
-  };
+  const highRiskTopics = annotatedTopics.filter((t) => t.risk === "High");
+  const highRiskCount = highRiskTopics.length;
+  const medRiskCount = annotatedTopics.filter((t) => t.risk === "Medium").length;
+  const lowRiskCount = annotatedTopics.filter((t) => t.risk === "Low").length;
 
-  // Compute stats dynamically
-  let totalRetentionSum = 0;
-  let highRiskCount = 0;
-  let medRiskCount = 0;
-  let lowRiskCount = 0;
-  const highRiskTopics = [];
-  const upcomingRevisions = [];
-
-  topics.forEach((topic) => {
-    const daysElapsed = getDaysElapsed(topic.lastStudied);
-    const risk = calculateTopicRisk(topic);
-
-    // Heuristic Memory Retention Score calculation
-    const decayFactor = Math.max(0.4, 1 - daysElapsed * 0.06); // 6% memory decay per day elapsed, floor at 40%
-    const baseScore = (topic.quizScore * 0.6) + (topic.confidenceScore * 8); // Weighted scale (max 60 + 40 = 100)
-    const retentionVal = Math.round(baseScore * decayFactor);
-    totalRetentionSum += retentionVal;
-
-    if (risk === "High") {
-      highRiskCount++;
-      highRiskTopics.push({ ...topic, retentionVal });
-    } else if (risk === "Medium") {
-      medRiskCount++;
-    } else {
-      lowRiskCount++;
-    }
-
-    // Schedule revision if days elapsed > 2
-    if (daysElapsed >= 2 || risk === "High") {
-      upcomingRevisions.push({ ...topic, daysElapsed, risk });
-    }
-  });
-
+  const totalRetentionSum = annotatedTopics.reduce((sum, topic) => sum + topic.retentionVal, 0);
   const averageRetention = topics.length > 0 ? Math.round(totalRetentionSum / topics.length) : 0;
+
+  // Schedule revision if days elapsed >= 2 or risk is High
+  const upcomingRevisions = annotatedTopics.filter((t) => t.daysElapsed >= 2 || t.risk === "High");
 
   // Streak tracker
   const [streak] = useLocalStorage("streak", 5);

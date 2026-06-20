@@ -1,9 +1,10 @@
-import React, { useState } from "react";
-import { Plus, Trash2, BookOpen, Star, RefreshCw, Award, Clock } from "lucide-react";
+import { useState } from "react";
+import { Plus, Trash2, BookOpen, Star, Award, Clock, Brain } from "lucide-react";
 import useLocalStorage from "../hooks/useLocalStorage";
 import { INITIAL_TOPICS } from "../utils/mockData";
 import Card from "../components/Card";
 import Button from "../components/Button";
+import { calculateRetention, getForgetRisk } from "../utils/decayEngine";
 
 const StudyTracker = () => {
   const [topics, setTopics] = useLocalStorage("topics", INITIAL_TOPICS);
@@ -82,20 +83,7 @@ const StudyTracker = () => {
     );
   };
 
-  // Helper: check risk level (client-side heuristic logic)
-  const getRiskLevel = (topic) => {
-    const lastDate = new Date(topic.lastStudied);
-    const currentDate = new Date("2026-06-20");
-    const diffDays = Math.ceil(Math.abs(currentDate - lastDate) / (1000 * 60 * 60 * 24)) || 0;
-
-    if (topic.confidenceScore <= 2 || topic.quizScore < 60 || diffDays > 7) {
-      return "High";
-    } else if (topic.confidenceScore === 3 || (topic.quizScore >= 60 && topic.quizScore < 80) || diffDays >= 4) {
-      return "Medium";
-    } else {
-      return "Low";
-    }
-  };
+  // Calculations are now delegated to the centralized decayEngine.js utility
 
   return (
     <div className="tracker-page">
@@ -198,7 +186,9 @@ const StudyTracker = () => {
             ) : (
               <div className="topics-log-list">
                 {topics.map((topic) => {
-                  const risk = getRiskLevel(topic);
+                  const retention = calculateRetention(topic);
+                  const riskObj = getForgetRisk(retention);
+                  const risk = riskObj.category;
                   return (
                     <div key={topic.id} className="topic-log-card">
                       <div className="topic-log-header">
@@ -225,6 +215,10 @@ const StudyTracker = () => {
                         <div className="detail-item">
                           <Award size={14} className="text-accent" />
                           <span>Quiz: {topic.quizScore}%</span>
+                        </div>
+                        <div className="detail-item">
+                          <Brain size={14} className="text-primary" />
+                          <span className="font-bold">Ret: {retention}%</span>
                         </div>
                       </div>
 
