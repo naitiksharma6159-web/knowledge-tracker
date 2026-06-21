@@ -32,6 +32,7 @@ app.include_router(risk_router, prefix="/api", tags=["Risk"])
 app.include_router(recommendations_router, prefix="/api", tags=["Recommendations"])
 app.include_router(auth_router, prefix="/api", tags=["Authentication"])
 
+
 @app.get("/api/health", tags=["System"])
 def health_check():
     """

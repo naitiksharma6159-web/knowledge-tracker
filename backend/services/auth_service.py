@@ -74,3 +74,5 @@ def create_user(conn: sqlite3.Connection, name: str, email: str, password_plain:
     cursor.execute("SELECT id, name, email, password_hash, created_at FROM users WHERE id = ?", (cursor.lastrowid,))
     row = cursor.fetchone()
     return DBUser.from_row(row)
+
+

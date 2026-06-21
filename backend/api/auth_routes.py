@@ -69,3 +69,5 @@ def auth_health():
     Auth module health check endpoint.
     """
     return {"status": "ok"}
+
+

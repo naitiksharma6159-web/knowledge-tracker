@@ -159,3 +159,6 @@ def test_login_nonexistent_user(client):
     response = client.post("/api/auth/login", json=login_payload)
     assert response.status_code == 401
     assert "Invalid email or password" in response.json()["detail"]
+
+
+

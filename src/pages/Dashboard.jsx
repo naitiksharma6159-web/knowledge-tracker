@@ -1,13 +1,18 @@
+import { useContext } from "react";
 import { Link } from "react-router-dom";
-import { Brain, Flame, Clock, AlertTriangle, Calendar, Award, TrendingUp } from "lucide-react";
+import { Brain, Flame, Clock, AlertTriangle, Calendar, Award, TrendingUp, BookOpen, FileText } from "lucide-react";
 import useLocalStorage from "../hooks/useLocalStorage";
 import { INITIAL_TOPICS } from "../utils/mockData";
 import Card from "../components/Card";
 import Button from "../components/Button";
 import { getRevisionRecommendations } from "../utils/decayEngine";
+import { AuthContext } from "../context/AuthContext";
 
 const Dashboard = () => {
+  const { user } = useContext(AuthContext);
   const [topics] = useLocalStorage("topics", INITIAL_TOPICS);
+  const [notes] = useLocalStorage("notes", []);
+
 
   // Compute stats dynamically using the centralized decay engine
   const annotatedTopics = getRevisionRecommendations(topics);
@@ -51,8 +56,44 @@ const Dashboard = () => {
         </div>
       </div>
 
+      {/* Welcome banner & Stats */}
+      {user && (
+        <Card className="profile-banner-card" style={styles.profileBanner}>
+          <div style={styles.profileInfo}>
+            <div style={styles.avatar}>
+              {user.name ? user.name.charAt(0).toUpperCase() : "U"}
+            </div>
+            <div>
+              <h2 style={styles.welcomeTitle}>Welcome back, {user.name}</h2>
+              <p style={styles.welcomeSubtitle}>{user.email}</p>
+            </div>
+          </div>
+          <div style={styles.statsContainer}>
+            <div style={styles.statBox}>
+              <div style={styles.statIconWrapper}>
+                <FileText size={18} style={{ color: "#6366f1" }} />
+              </div>
+              <div>
+                <span style={styles.statLabel}>Total Notes</span>
+                <span style={styles.statValue}>{notes.length}</span>
+              </div>
+            </div>
+            <div style={styles.statBox}>
+              <div style={styles.statIconWrapper}>
+                <BookOpen size={18} style={{ color: "#a855f7" }} />
+              </div>
+              <div>
+                <span style={styles.statLabel}>Study Sessions</span>
+                <span style={styles.statValue}>{topics.length}</span>
+              </div>
+            </div>
+          </div>
+        </Card>
+      )}
+
       {/* Grid: 4 Metric Cards */}
       <div className="metrics-grid">
+
         <Card className="metric-card">
           <div className="metric-icon bg-primary-light">
             <Brain className="text-primary" size={24} />
@@ -261,4 +302,85 @@ const Dashboard = () => {
   );
 };
 
+const styles = {
+  profileBanner: {
+    background: "linear-gradient(135deg, rgba(99, 102, 241, 0.15) 0%, rgba(168, 85, 247, 0.15) 100%)",
+    border: "1px solid rgba(255, 255, 255, 0.08)",
+    borderRadius: "16px",
+    padding: "24px",
+    marginBottom: "24px",
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: "20px",
+  },
+  profileInfo: {
+    display: "flex",
+    alignItems: "center",
+    gap: "16px",
+  },
+  avatar: {
+    width: "48px",
+    height: "48px",
+    borderRadius: "50%",
+    background: "linear-gradient(135deg, #6366f1 0%, #a855f7 100%)",
+    color: "#ffffff",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontWeight: "700",
+    fontSize: "18px",
+    boxShadow: "0 4px 12px rgba(99, 102, 241, 0.3)",
+  },
+  welcomeTitle: {
+    fontSize: "20px",
+    fontWeight: "700",
+    color: "#f8fafc",
+    margin: 0,
+  },
+  welcomeSubtitle: {
+    fontSize: "14px",
+    color: "#cbd5e1",
+    margin: "4px 0 0 0",
+  },
+  statsContainer: {
+    display: "flex",
+    gap: "24px",
+    flexWrap: "wrap",
+  },
+  statBox: {
+    display: "flex",
+    alignItems: "center",
+    gap: "12px",
+    background: "rgba(15, 23, 42, 0.4)",
+    padding: "12px 20px",
+    borderRadius: "12px",
+    border: "1px solid rgba(255, 255, 255, 0.04)",
+  },
+  statIconWrapper: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    width: "36px",
+    height: "36px",
+    borderRadius: "8px",
+    background: "rgba(255, 255, 255, 0.03)",
+  },
+  statLabel: {
+    display: "block",
+    fontSize: "11px",
+    fontWeight: "600",
+    color: "#94a3b8",
+    textTransform: "uppercase",
+    letterSpacing: "0.05em",
+  },
+  statValue: {
+    fontSize: "20px",
+    fontWeight: "700",
+    color: "#f8fafc",
+  },
+};
+
 export default Dashboard;
+

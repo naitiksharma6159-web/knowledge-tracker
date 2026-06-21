@@ -1,12 +1,21 @@
 import React, { useState, useContext } from "react";
-import { NavLink, Link } from "react-router-dom";
+import { NavLink, Link, useNavigate } from "react-router-dom";
 import { Brain, Menu, X, LayoutDashboard, Calendar, FileText, MessageSquare, Home, LogOut } from "lucide-react";
 import { AuthContext } from "../context/AuthContext";
 import "./Navbar.css";
 
 const Navbar = () => {
+  const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const { user, logout, isAuthenticated } = useContext(AuthContext);
+
+
+  const handleLogout = () => {
+    logout();
+    closeMenu();
+    navigate("/login");
+  };
+
 
   const toggleMenu = () => {
     setIsOpen(!isOpen);
@@ -65,7 +74,7 @@ const Navbar = () => {
             <span className="welcome-msg" style={{ color: '#cbd5e1', fontSize: '14px', fontWeight: '500' }}>
               Hi, {user.name}
             </span>
-            <button onClick={logout} className="nav-cta-btn" style={{ background: '#334155', border: '1px solid rgba(255,255,255,0.1)', color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+            <button onClick={handleLogout} className="nav-cta-btn" style={{ background: '#334155', border: '1px solid rgba(255,255,255,0.1)', color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
               <LogOut size={14} />
               <span>Log Out</span>
             </button>
