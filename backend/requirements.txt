@@ -1,0 +1,6 @@
+pytest>=7.0.0
+fastapi
+uvicorn[standard]
+pydantic>=2.0
+httpx
+email-validator

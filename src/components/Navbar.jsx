@@ -1,10 +1,12 @@
-import React, { useState } from "react";
+import React, { useState, useContext } from "react";
 import { NavLink, Link } from "react-router-dom";
-import { Brain, Menu, X, LayoutDashboard, Calendar, FileText, MessageSquare, Home } from "lucide-react";
+import { Brain, Menu, X, LayoutDashboard, Calendar, FileText, MessageSquare, Home, LogOut } from "lucide-react";
+import { AuthContext } from "../context/AuthContext";
 import "./Navbar.css";
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
+  const { user, logout, isAuthenticated } = useContext(AuthContext);
 
   const toggleMenu = () => {
     setIsOpen(!isOpen);
@@ -58,9 +60,26 @@ const Navbar = () => {
 
       {/* Right - Button (Desktop) & Hamburger Menu */}
       <div className="nav-actions">
-        <Link to="/dashboard" className="nav-desktop-btn-link">
-          <button className="nav-cta-btn">Get Started</button>
-        </Link>
+        {isAuthenticated ? (
+          <div className="user-profile-nav" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <span className="welcome-msg" style={{ color: '#cbd5e1', fontSize: '14px', fontWeight: '500' }}>
+              Hi, {user.name}
+            </span>
+            <button onClick={logout} className="nav-cta-btn" style={{ background: '#334155', border: '1px solid rgba(255,255,255,0.1)', color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+              <LogOut size={14} />
+              <span>Log Out</span>
+            </button>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', gap: '12px' }}>
+            <Link to="/login" className="nav-desktop-btn-link">
+              <button className="nav-cta-btn" style={{ background: 'transparent', border: '1px solid var(--primary, #6366f1)', color: 'var(--primary, #6366f1)', cursor: 'pointer' }}>Log In</button>
+            </Link>
+            <Link to="/signup" className="nav-desktop-btn-link">
+              <button className="nav-cta-btn" style={{ cursor: 'pointer' }}>Sign Up</button>
+            </Link>
+          </div>
+        )}
 
         <button className="hamburger-menu" onClick={toggleMenu} aria-label="Toggle menu">
           {isOpen ? <X size={24} /> : <Menu size={24} />}
