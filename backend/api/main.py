@@ -6,6 +6,8 @@ from backend.api.routes.recommendations import router as recommendations_router
 from backend.database.database import init_db
 from backend.api.auth_routes import router as auth_router
 from backend.api.routes.notes import router as notes_router
+from backend.api.routes.search import router as search_router
+from backend.api.routes.ml import router as ml_router
 
 app = FastAPI(
     title="Knowledge Tracker API",
@@ -33,6 +35,8 @@ app.include_router(risk_router, prefix="/api", tags=["Risk"])
 app.include_router(recommendations_router, prefix="/api", tags=["Recommendations"])
 app.include_router(auth_router, prefix="/api", tags=["Authentication"])
 app.include_router(notes_router, prefix="/api", tags=["Notes"])
+app.include_router(search_router, prefix="/api", tags=["Search"])
+app.include_router(ml_router, prefix="/api", tags=["ML"])
 
 
 
