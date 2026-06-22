@@ -1,8 +1,12 @@
 import sqlite3
 import json
+import logging
 from datetime import datetime
 from typing import List, Optional
 from backend.database.models import DBNote
+from backend.services.ir_service import rebuild_user_index
+
+logger = logging.getLogger(__name__)
 
 def get_notes_by_user(db: sqlite3.Connection, user_id: int) -> List[DBNote]:
     """
@@ -48,6 +52,18 @@ def create_note(db: sqlite3.Connection, user_id: int, title: str, content: str, 
         (cursor.lastrowid,)
     )
     row = cursor.fetchone()
+    
+    # Rebuild user's search index automatically (Phase 8.1)
+    try:
+        rebuild_user_index(db, user_id)
+    except Exception as e:
+        logger.error(
+            "Failed to automatically rebuild IR index for user_id=%s after note creation: %s",
+            user_id,
+            str(e),
+            exc_info=True
+        )
+        
     return DBNote.from_row(row)
 
 def update_note(db: sqlite3.Connection, note_id: int, user_id: int, title: str, content: str, tags: List[str]) -> Optional[DBNote]:
@@ -69,6 +85,17 @@ def update_note(db: sqlite3.Connection, note_id: int, user_id: int, title: str, 
     )
     db.commit()
     
+    # Rebuild user's search index automatically (Phase 8.1)
+    try:
+        rebuild_user_index(db, user_id)
+    except Exception as e:
+        logger.error(
+            "Failed to automatically rebuild IR index for user_id=%s after note update: %s",
+            user_id,
+            str(e),
+            exc_info=True
+        )
+        
     # Return updated note
     return get_note_by_id(db, note_id, user_id)
 
@@ -86,4 +113,16 @@ def delete_note(db: sqlite3.Connection, note_id: int, user_id: int) -> bool:
         (note_id, user_id)
     )
     db.commit()
+    
+    # Rebuild user's search index automatically (Phase 8.1)
+    try:
+        rebuild_user_index(db, user_id)
+    except Exception as e:
+        logger.error(
+            "Failed to automatically rebuild IR index for user_id=%s after note deletion: %s",
+            user_id,
+            str(e),
+            exc_info=True
+        )
+        
     return True

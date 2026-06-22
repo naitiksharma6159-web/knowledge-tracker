@@ -140,3 +140,67 @@ def test_search_user_isolation(client):
     assert response.status_code == 200
     assert len(response.json()) == 1
     assert response.json()[0]["title"] == "Secret Python Snippet"
+
+def test_automatic_index_synchronization(client):
+    # 1. Register and login User A and User B
+    token_a, user_a = register_and_login(client, name="User A", email="usera_sync@example.com")
+    token_b, user_b = register_and_login(client, name="User B", email="userb_sync@example.com")
+    
+    headers_a = {"Authorization": f"Bearer {token_a}"}
+    headers_b = {"Authorization": f"Bearer {token_b}"}
+    
+    # --- STEP 1: Create note -> searchable immediately ---
+    create_response = client.post("/api/notes", json={
+        "title": "Quantum Computing Fundamentals",
+        "content": "Superposition and entanglement are key principles of quantum computers.",
+        "tags": ["quantum"]
+    }, headers=headers_a)
+    assert create_response.status_code == 201
+    note_id = create_response.json()["id"]
+    
+    # Search immediately (no manual rebuild!)
+    search_response = client.get("/api/search?q=entanglement", headers=headers_a)
+    assert search_response.status_code == 200
+    results = search_response.json()
+    assert len(results) == 1
+    assert results[0]["note_id"] == note_id
+    assert results[0]["title"] == "Quantum Computing Fundamentals"
+    assert results[0]["score"] > 0
+    
+    # --- STEP 2: User isolation during creation ---
+    # User B searches for "entanglement" - should get empty results
+    search_b_response = client.get("/api/search?q=entanglement", headers=headers_b)
+    assert search_b_response.status_code == 200
+    assert search_b_response.json() == []
+    
+    # --- STEP 3: Update note -> search results updated ---
+    # User A updates the note (changing content so "entanglement" is gone and replaced by "teleportation")
+    update_response = client.put(f"/api/notes/{note_id}", json={
+        "title": "Quantum Computing Advanced",
+        "content": "Teleportation and cryptography are advanced topics in quantum mechanics.",
+        "tags": ["quantum", "advanced"]
+    }, headers=headers_a)
+    assert update_response.status_code == 200
+    
+    # Search for old keyword "entanglement" - should be gone / empty results
+    search_old_response = client.get("/api/search?q=entanglement", headers=headers_a)
+    assert search_old_response.status_code == 200
+    assert search_old_response.json() == []
+    
+    # Search for new keyword "teleportation" - should match immediately
+    search_new_response = client.get("/api/search?q=teleportation", headers=headers_a)
+    assert search_new_response.status_code == 200
+    new_results = search_new_response.json()
+    assert len(new_results) == 1
+    assert new_results[0]["note_id"] == note_id
+    assert new_results[0]["title"] == "Quantum Computing Advanced"
+    
+    # --- STEP 4: Delete note -> removed from results ---
+    # User A deletes the note
+    delete_response = client.delete(f"/api/notes/{note_id}", headers=headers_a)
+    assert delete_response.status_code == 204
+    
+    # Search for "teleportation" - should be empty immediately
+    search_deleted_response = client.get("/api/search?q=teleportation", headers=headers_a)
+    assert search_deleted_response.status_code == 200
+    assert search_deleted_response.json() == []
