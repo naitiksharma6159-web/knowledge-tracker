@@ -40,3 +40,29 @@ class RecommendationsRequest(BaseModel):
 
     records: List[TopicRecord] = Field(..., validation_alias=AliasChoices('records', 'topics'))
     reference_date: Optional[str] = Field(default=None, validation_alias=AliasChoices('reference_date', 'referenceDate'))
+
+
+class NoteBase(BaseModel):
+    title: str
+    content: str
+    tags: List[str] = []
+
+class NoteCreate(NoteBase):
+    pass
+
+class NoteUpdate(NoteBase):
+    pass
+
+class NoteResponse(BaseModel):
+    id: int
+    user_id: int = Field(..., serialization_alias="userId", validation_alias=AliasChoices("user_id", "userId"))
+    title: str
+    content: str
+    tags: List[str] = []
+    created_at: str = Field(..., serialization_alias="createdAt", validation_alias=AliasChoices("created_at", "createdAt"))
+    updated_at: str = Field(..., serialization_alias="updatedAt", validation_alias=AliasChoices("updated_at", "updatedAt"))
+
+    model_config = ConfigDict(
+        populate_by_name=True,
+        from_attributes=True
+    )

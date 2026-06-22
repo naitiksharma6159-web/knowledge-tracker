@@ -125,7 +125,13 @@ def test_login_success(client):
     }
     response = client.post("/api/auth/login", json=login_payload)
     assert response.status_code == 200
-    assert response.json() == {"message": "Login successful"}
+    data = response.json()
+    assert data["message"] == "Login successful"
+    assert "token" in data
+    assert data["user"]["email"] == "charlie@example.com"
+    assert data["user"]["name"] == "Charlie Brown"
+    assert "id" in data["user"]
+
 
 def test_login_invalid_password(client):
     """

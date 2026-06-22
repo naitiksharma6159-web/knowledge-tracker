@@ -54,6 +54,7 @@ def login(payload: LoginRequest, db: sqlite3.Connection = Depends(get_db)):
     Endpoint to log in a user.
     Verifies stored password hash against submitted plain password.
     Returns 401 Unauthorized if verification fails.
+    On success, generates and returns a JWT token.
     """
     user = auth_service.get_user_by_email(db, payload.email)
     if not user or not auth_service.verify_password(user.password_hash, payload.password):
@@ -61,7 +62,20 @@ def login(payload: LoginRequest, db: sqlite3.Connection = Depends(get_db)):
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password"
         )
-    return {"message": "Login successful"}
+    
+    # Generate token
+    token = auth_service.create_jwt({"user_id": user.id, "email": user.email})
+    
+    return {
+        "message": "Login successful",
+        "token": token,
+        "user": {
+            "id": user.id,
+            "email": user.email,
+            "name": user.name
+        }
+    }
+
 
 @router.get("/health")
 def auth_health():

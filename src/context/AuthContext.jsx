@@ -12,16 +12,17 @@ export const AuthProvider = ({ children }) => {
     }
   });
 
-  const login = (email, name) => {
-    const userData = { email, name };
-    localStorage.setItem("user", JSON.stringify(userData));
-    setUser(userData);
+  const login = (userData, token) => {
+    const data = { ...userData, token };
+    localStorage.setItem("user", JSON.stringify(data));
+    setUser(data);
   };
 
   const logout = () => {
     localStorage.removeItem("user");
     setUser(null);
   };
+
 
   return (
     <AuthContext.Provider value={{ user, login, logout, isAuthenticated: !!user, loading: false }}>

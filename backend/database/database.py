@@ -16,10 +16,14 @@ def get_db_connection(db_path: str = None):
 
 def init_db(db_path: str = None):
     """
-    Initialize the SQLite database schema by creating the users table if it does not exist.
+    Initialize the SQLite database schema by creating the users and notes tables if they do not exist.
     """
     conn = get_db_connection(db_path)
     cursor = conn.cursor()
+    
+    # Enable foreign keys
+    cursor.execute("PRAGMA foreign_keys = ON;")
+    
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -29,5 +33,20 @@ def init_db(db_path: str = None):
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
     """)
+    
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS notes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        title TEXT NOT NULL,
+        content TEXT NOT NULL,
+        tags TEXT DEFAULT '[]',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+    """)
+    
     conn.commit()
     conn.close()
+

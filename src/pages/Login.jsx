@@ -47,7 +47,7 @@ const Login = () => {
       if (response.ok) {
         setSuccess("Login successful! Redirecting...");
         setTimeout(() => {
-          login(email, email.split("@")[0]); // store simple session locally
+          login(data.user, data.token);
           navigate("/dashboard");
         }, 1500);
       } else {

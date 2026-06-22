@@ -1,8 +1,11 @@
 import hashlib
 import os
 import sqlite3
+import base64
+import hmac
 from typing import Optional, Dict, Any
 from backend.database.models import DBUser
+
 
 # Password Hashing Utilities using PBKDF2-SHA256
 def hash_password(password: str) -> str:
@@ -74,5 +77,67 @@ def create_user(conn: sqlite3.Connection, name: str, email: str, password_plain:
     cursor.execute("SELECT id, name, email, password_hash, created_at FROM users WHERE id = ?", (cursor.lastrowid,))
     row = cursor.fetchone()
     return DBUser.from_row(row)
+
+
+# JWT Helpers
+JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "super-secret-key-for-knowledge-tracker")
+
+def base64url_encode(data: bytes) -> str:
+    return base64.urlsafe_b64encode(data).decode('utf-8').rstrip('=')
+
+def base64url_decode(data: str) -> bytes:
+    padding = '=' * (4 - len(data) % 4)
+    return base64.urlsafe_b64decode(data + padding)
+
+def create_jwt(payload: dict, expires_in: int = 3600 * 24) -> str:
+    """
+    Creates a standard HS256 JWT using standard libraries.
+    """
+    import json
+    import time
+    
+    payload_copy = payload.copy()
+    payload_copy["exp"] = int(time.time()) + expires_in
+    
+    header = {"alg": "HS256", "typ": "JWT"}
+    
+    header_b64 = base64url_encode(json.dumps(header).encode('utf-8'))
+    payload_b64 = base64url_encode(json.dumps(payload_copy).encode('utf-8'))
+    
+    signing_input = f"{header_b64}.{payload_b64}".encode('utf-8')
+    signature = hmac.new(JWT_SECRET_KEY.encode('utf-8'), signing_input, hashlib.sha256).digest()
+    signature_b64 = base64url_encode(signature)
+    
+    return f"{header_b64}.{payload_b64}.{signature_b64}"
+
+def decode_jwt(token: str) -> Optional[dict]:
+    """
+    Decodes and validates a standard HS256 JWT, verifying the signature and expiration.
+    """
+    import json
+    import time
+    
+    try:
+        parts = token.split('.')
+        if len(parts) != 3:
+            return None
+        header_b64, payload_b64, signature_b64 = parts
+        
+        signing_input = f"{header_b64}.{payload_b64}".encode('utf-8')
+        expected_signature = hmac.new(JWT_SECRET_KEY.encode('utf-8'), signing_input, hashlib.sha256).digest()
+        expected_signature_b64 = base64url_encode(expected_signature)
+        
+        if not hmac.compare_digest(signature_b64, expected_signature_b64):
+            return None
+            
+        payload = json.loads(base64url_decode(payload_b64).decode('utf-8'))
+        
+        if "exp" in payload and payload["exp"] < time.time():
+            return None
+            
+        return payload
+    except Exception:
+        return None
+
 
 

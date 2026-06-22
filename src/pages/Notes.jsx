@@ -1,14 +1,15 @@
-import React, { useState } from "react";
-import { Search, Plus, Trash2, FileText, UploadCloud, Tag, X } from "lucide-react";
-import useLocalStorage from "../hooks/useLocalStorage";
-import { INITIAL_NOTES } from "../utils/mockData";
+import React, { useState, useEffect } from "react";
+import { Search, Plus, Trash2, FileText, UploadCloud, Tag, Edit3, X } from "lucide-react";
+import { getNotes, createNote, updateNote, deleteNote } from "../api/notes";
 import Card from "../components/Card";
 import Button from "../components/Button";
 
 const Notes = () => {
-  const [notes, setNotes] = useLocalStorage("notes", INITIAL_NOTES);
+  const [notes, setNotes] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTag, setSelectedTag] = useState("All");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   // Form states for adding notes manually
   const [isCreating, setIsCreating] = useState(false);
@@ -18,12 +19,36 @@ const Notes = () => {
 
   // Detailed view note modal state
   const [viewingNote, setViewingNote] = useState(null);
+  
+  // Edit note states
+  const [isEditing, setIsEditing] = useState(false);
+  const [editTitle, setEditTitle] = useState("");
+  const [editContent, setEditContent] = useState("");
+  const [editTagsStr, setEditTagsStr] = useState("");
 
   // File upload drag state
   const [dragActive, setDragActive] = useState(false);
 
+  // Fetch notes on component mount
+  useEffect(() => {
+    const fetchNotes = async () => {
+      setLoading(true);
+      setError("");
+      try {
+        const data = await getNotes();
+        setNotes(data);
+      } catch (err) {
+        console.error("Error fetching notes:", err);
+        setError(err.message || "Failed to load notes.");
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchNotes();
+  }, []);
+
   // Add notes manually
-  const handleAddNote = (e) => {
+  const handleAddNote = async (e) => {
     e.preventDefault();
     if (!newTitle.trim() || !newContent.trim()) {
       alert("Please enter a title and content.");
@@ -35,53 +60,97 @@ const Notes = () => {
       .map((tag) => tag.trim())
       .filter((tag) => tag.length > 0);
 
-    const newNote = {
-      id: `note-${Date.now()}`,
-      title: newTitle.trim(),
-      content: newContent.trim(),
-      tags: parsedTags.length > 0 ? parsedTags : ["General"],
-      updatedAt: new Date().toISOString().split("T")[0]
-    };
+    try {
+      const created = await createNote({
+        title: newTitle.trim(),
+        content: newContent.trim(),
+        tags: parsedTags.length > 0 ? parsedTags : ["General"]
+      });
+      setNotes([created, ...notes]);
+      
+      // Reset Form states
+      setNewTitle("");
+      setNewContent("");
+      setNewTagsStr("");
+      setIsCreating(false);
+    } catch (err) {
+      alert(err.message || "Failed to save note.");
+    }
+  };
 
-    setNotes([newNote, ...notes]);
-    
-    // Reset Form states
-    setNewTitle("");
-    setNewContent("");
-    setNewTagsStr("");
-    setIsCreating(false);
+  // Start Edit mode
+  const handleStartEdit = (note) => {
+    setEditTitle(note.title);
+    setEditContent(note.content);
+    setEditTagsStr(note.tags.join(", "));
+    setIsEditing(true);
+  };
+
+  // Save Edit
+  const handleSaveEdit = async (e) => {
+    e.preventDefault();
+    if (!editTitle.trim() || !editContent.trim()) {
+      alert("Please enter a title and content.");
+      return;
+    }
+
+    const parsedTags = editTagsStr
+      .split(",")
+      .map((tag) => tag.trim())
+      .filter((tag) => tag.length > 0);
+
+    try {
+      const updated = await updateNote(viewingNote.id, {
+        title: editTitle.trim(),
+        content: editContent.trim(),
+        tags: parsedTags.length > 0 ? parsedTags : ["General"]
+      });
+      
+      // Update state
+      setNotes(notes.map((note) => (note.id === viewingNote.id ? updated : note)));
+      setViewingNote(updated);
+      setIsEditing(false);
+    } catch (err) {
+      alert(err.message || "Failed to update note.");
+    }
   };
 
   // Delete note
-  const handleDeleteNote = (id, e) => {
+  const handleDeleteNote = async (id, e) => {
     e.stopPropagation(); // Stop click from triggering parent card open
     if (window.confirm("Are you sure you want to delete this note?")) {
-      setNotes(notes.filter((note) => note.id !== id));
-      if (viewingNote && viewingNote.id === id) {
-        setViewingNote(null);
+      try {
+        await deleteNote(id);
+        setNotes(notes.filter((note) => note.id !== id));
+        if (viewingNote && viewingNote.id === id) {
+          setViewingNote(null);
+          setIsEditing(false);
+        }
+      } catch (err) {
+        alert(err.message || "Failed to delete note.");
       }
     }
   };
 
-  // Parse files dropped / uploaded on the client side
+  // Parse files dropped / uploaded on the client side and save to SQLite
   const handleFile = (file) => {
     if (!file) return;
 
-    // Check if it's text or markdown
     const fileReader = new FileReader();
-    fileReader.onload = (e) => {
+    fileReader.onload = async (e) => {
       const content = e.target.result;
       const cleanName = file.name.replace(/\.[^/.]+$/, ""); // strip extension
 
-      const newUploadedNote = {
-        id: `note-${Date.now()}`,
-        title: cleanName,
-        content: content || "No text content found inside file.",
-        tags: ["Imported", file.type ? file.type.split("/")[1] : "txt"],
-        updatedAt: new Date().toISOString().split("T")[0]
-      };
-
-      setNotes([newUploadedNote, ...notes]);
+      try {
+        const created = await createNote({
+          title: cleanName,
+          content: content || "No text content found inside file.",
+          tags: ["Imported", file.type ? file.type.split("/")[1] : "txt"]
+        });
+        setNotes([created, ...notes]);
+      } catch (err) {
+        alert(err.message || "Failed to import note file.");
+      }
     };
     fileReader.readAsText(file);
   };
@@ -114,11 +183,12 @@ const Notes = () => {
   };
 
   // Extract all distinct tags for filtering
-  const allTags = ["All", ...new Set(notes.flatMap((note) => note.tags))];
+  const allTags = ["All", ...new Set(notes.flatMap((note) => note.tags || []))];
 
   // Filter notes based on tag select & text search
   const filteredNotes = notes.filter((note) => {
-    const matchesTag = selectedTag === "All" || note.tags.includes(selectedTag);
+    const tags = note.tags || [];
+    const matchesTag = selectedTag === "All" || tags.includes(selectedTag);
     const matchesSearch =
       note.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       note.content.toLowerCase().includes(searchQuery.toLowerCase());
@@ -131,6 +201,12 @@ const Notes = () => {
         <h1>Summaries & Notes Catalog</h1>
         <p className="subtitle">Search, organize, or upload text materials to support revision sessions.</p>
       </div>
+
+      {error && (
+        <div className="error-alert" style={{ marginBottom: "20px", padding: "12px", background: "rgba(239, 68, 68, 0.15)", border: "1px solid rgba(239, 68, 68, 0.3)", borderRadius: "8px", color: "#fca5a5" }}>
+          {error}
+        </div>
+      )}
 
       {/* Main Layout Grid */}
       <div className="notes-layout">
@@ -147,7 +223,7 @@ const Notes = () => {
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
-            <Button variant="primary" onClick={() => setIsCreating(true)}>
+            <Button variant="primary" onClick={() => { setIsCreating(true); setViewingNote(null); setIsEditing(false); }}>
               <Plus size={16} style={{ marginRight: "6px" }} /> Write Note
             </Button>
           </div>
@@ -178,7 +254,7 @@ const Notes = () => {
               id="file-input-notes"
               style={{ display: "none" }}
               onChange={handleFileInputChange}
-              accept=".txt,.md,.json"
+              accept=".txt,.md,.pdf,.doc,.docx,.json"
             />
             <label htmlFor="file-input-notes" className="dropzone-label">
               <UploadCloud size={32} className="text-primary icon-bounce" />
@@ -188,7 +264,9 @@ const Notes = () => {
 
           {/* Catalog grid */}
           <div className="notes-catalog-grid">
-            {filteredNotes.length === 0 ? (
+            {loading ? (
+              <p className="text-muted text-center py-6 col-span-all">Loading notes from server...</p>
+            ) : filteredNotes.length === 0 ? (
               <div className="empty-panel text-center py-6 col-span-all">
                 <FileText size={48} className="text-muted mb-2" />
                 <p>No matching notes found. Clear filter or add a summary to start.</p>
@@ -197,8 +275,9 @@ const Notes = () => {
               filteredNotes.map((note) => (
                 <Card
                   key={note.id}
-                  className="note-summary-card cursor-pointer"
-                  onClick={() => setViewingNote(note)}
+                  className={`note-summary-card cursor-pointer ${viewingNote && viewingNote.id === note.id ? "active-border" : ""}`}
+                  onClick={() => { setViewingNote(note); setIsEditing(false); setIsCreating(false); }}
+                  style={viewingNote && viewingNote.id === note.id ? { border: "1px solid var(--primary, #6366f1)" } : {}}
                 >
                   <div className="note-card-header">
                     <h4>{note.title}</h4>
@@ -213,11 +292,11 @@ const Notes = () => {
                   <p className="note-card-preview">{note.content.substring(0, 120)}...</p>
                   <div className="note-card-footer">
                     <div className="card-tags-list">
-                      {note.tags.map((tag) => (
+                      {(note.tags || []).map((tag) => (
                         <span key={tag} className="badge-tag">{tag}</span>
                       ))}
                     </div>
-                    <span className="note-date">{note.updatedAt}</span>
+                    <span className="note-date">{(note.updatedAt || "").split("T")[0]}</span>
                   </div>
                 </Card>
               ))
@@ -276,24 +355,85 @@ const Notes = () => {
                 </div>
               </form>
             </Card>
+          ) : isEditing && viewingNote ? (
+            /* Editing existing note */
+            <Card title="Edit Summary">
+              <form onSubmit={handleSaveEdit} className="note-creation-form">
+                <div className="form-group">
+                  <label htmlFor="edit-title-input">Title</label>
+                  <input
+                    type="text"
+                    id="edit-title-input"
+                    value={editTitle}
+                    onChange={(e) => setEditTitle(e.target.value)}
+                    required
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="edit-tags-input">Tags (comma-separated)</label>
+                  <input
+                    type="text"
+                    id="edit-tags-input"
+                    value={editTagsStr}
+                    onChange={(e) => setEditTagsStr(e.target.value)}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="edit-body-input">Content Notes</label>
+                  <textarea
+                    id="edit-body-input"
+                    rows="12"
+                    value={editContent}
+                    onChange={(e) => setEditContent(e.target.value)}
+                    required
+                  ></textarea>
+                </div>
+
+                <div className="note-form-actions">
+                  <Button type="button" variant="outline" onClick={() => setIsEditing(false)}>
+                    Cancel
+                  </Button>
+                  <Button type="submit" variant="primary">
+                    Save Changes
+                  </Button>
+                </div>
+              </form>
+            </Card>
           ) : viewingNote ? (
             /* Reading note details */
             <Card
               title={viewingNote.title}
               actions={
-                <button onClick={() => setViewingNote(null)} className="close-viewer-btn" title="Close reader">
-                  <X size={18} />
-                </button>
+                <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                  <button
+                    onClick={() => handleStartEdit(viewingNote)}
+                    className="close-viewer-btn"
+                    title="Edit summary"
+                    style={{ background: "none", border: "none", color: "var(--primary, #6366f1)", cursor: "pointer" }}
+                  >
+                    <Edit3 size={18} />
+                  </button>
+                  <button
+                    onClick={() => setViewingNote(null)}
+                    className="close-viewer-btn"
+                    title="Close reader"
+                    style={{ background: "none", border: "none", color: "#94a3b8", cursor: "pointer" }}
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
               }
             >
               <div className="note-viewer">
                 <div className="viewer-meta">
                   <div className="card-tags-list">
-                    {viewingNote.tags.map((tag) => (
+                    {(viewingNote.tags || []).map((tag) => (
                       <span key={tag} className="badge-tag">{tag}</span>
                     ))}
                   </div>
-                  <span className="note-date">Updated: {viewingNote.updatedAt}</span>
+                  <span className="note-date">Updated: {(viewingNote.updatedAt || "").split("T")[0]}</span>
                 </div>
                 <div className="viewer-content">
                   {viewingNote.content.split("\n").map((para, i) => (

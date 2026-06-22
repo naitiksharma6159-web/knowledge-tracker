@@ -1,4 +1,4 @@
-import { useContext } from "react";
+import { useContext, useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Brain, Flame, Clock, AlertTriangle, Calendar, Award, TrendingUp, BookOpen, FileText } from "lucide-react";
 import useLocalStorage from "../hooks/useLocalStorage";
@@ -7,11 +7,25 @@ import Card from "../components/Card";
 import Button from "../components/Button";
 import { getRevisionRecommendations } from "../utils/decayEngine";
 import { AuthContext } from "../context/AuthContext";
+import { getNotes } from "../api/notes";
 
 const Dashboard = () => {
   const { user } = useContext(AuthContext);
   const [topics] = useLocalStorage("topics", INITIAL_TOPICS);
-  const [notes] = useLocalStorage("notes", []);
+  const [notes, setNotes] = useState([]);
+
+  useEffect(() => {
+    if (user && user.token) {
+      getNotes()
+        .then((data) => {
+          if (Array.isArray(data)) {
+            setNotes(data);
+          }
+        })
+        .catch((err) => console.error("Error fetching notes for dashboard:", err));
+    }
+  }, [user]);
+
 
 
   // Compute stats dynamically using the centralized decay engine
